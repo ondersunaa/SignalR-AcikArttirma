@@ -1,0 +1,163 @@
+﻿@using System.Collections.Specialized
+@{
+    ViewData["Title"] = "Home Page";
+}
+<style>
+    li {
+        text-decoration: none
+    }
+</style>
+
+@section Scripts
+{
+    <script src="~/lib/microsoft/signalr/dist/browser/signalr.min.js"></script>
+    <script type="text/javascript">
+        var lastTeklif = 0;
+        var teklifVeren = "";
+        var connection = new signalR.HubConnectionBuilder().withUrl("https://localhost:44350/AuctionHub").withAutomaticReconnect()
+            .configureLogging(signalR.LogLevel.Information).build();
+        connection.start().then(() => {
+            connection.invoke("GetAuctions");
+        }).catch((err) => {
+            console.log(err);
+        });
+        connection.on("ReveicerAuctions",
+            (auctionses) => {
+                auctionses.forEach((item) => {
+                    if (item.userCount == undefined) {
+                        item.userCount = 0;
+                    }
+                    $('#aucCard').html(`<div class="card float-left" style="width: 18rem;" ><img style="height:200px;" class="card-img-top" src="${item.photoUrl}" alt="Card image cap">
+                <div class="card-body">
+                    <h5 class="card-title">${item.product}</h5>
+                    <p class="card-text">${item.name}</p>
+                    <p class="card-text">Açılış Fiyatı: ${item.startingPrice} TL</p>
+                    <p class="card-text" id="userCount">Katılımcı Sayısı: ${item.UserCount}</p>
+                   <button type="button" id="katil" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
+                    Katıl
+                    </button>
+                </div></div>`);
+                });
+                console.log(auctionses);
+            });
+
+        connection.on("NewAuction",
+            (mesaj) => {
+                console.log(mesaj);
+                $('#noti').text(mesaj);
+                $('#aucCard').empty();
+                $('#displayDiv').css('display', 'block');
+                connection.invoke("GetAuctions");
+            });
+        $('#katilBtn').on('click',
+            function() {
+                $('#titleK').css('display', 'block');
+                var userName = $('#recipient-name').val();
+                connection.invoke("SubScribeAcikArtirma", userName);
+                $('#katil').prop('disabled', true);
+                $('#teklifVeren').text("Son Verilen Teklif: " + lastTeklif);
+                $('#sonTeklif').text("Son Teklifi Veren: " + teklifVeren);
+            });
+
+        $('#teklifBtn').on('click',
+            function() {
+                var tutar = $('#teklifTutar').val();
+                connection.invoke("offerUpdate", tutar);
+                $('#katil').prop('disabled', true);
+            });
+        connection.on("lastOffer",
+            (user, lastOffer) => {
+                $('#teklifVeren').text("Son Verilen Teklif: " + lastOffer);
+                $('#sonTeklif').text("Son Teklifi Veren: " + user);
+                lastTeklif = lastOffer;
+                teklifVeren = user;
+            });
+        connection.on("users",
+            users => {
+                var text = "";
+                $('#disClick').trigger('click');
+                // $('#aucCard').css('display', 'none');
+                var userCount = 0;
+                $.each(users,
+                    function(key, value) {
+                        userCount++;
+
+                        text += `<li>${value}</li>`;
+
+                    });
+                console.log(userCount);
+                $('#userList').html(text);
+                $('#infoArtirma').css('display', 'block');
+                $('#userCount').text("Katılımcı Sayısı: " + userCount);
+            });
+
+        var countDownDate = new Date("feb 5, 2022 20:37:52").getTime();
+        setInterval(function() {
+                var now = new Date().getTime();
+                var timeleft = countDownDate - now;
+
+                var days = Math.floor(timeleft / (1000 * 60 * 60 * 24));
+                var hours = Math.floor((timeleft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                var minutes = Math.floor((timeleft % (1000 * 60 * 60)) / (1000 * 60));
+                var seconds = Math.floor((timeleft % (1000 * 60)) / 1000);
+                $('.Timer').text("Açık arttırma kalan süre: " + hours + ":" + minutes + ":" + seconds);
+            },
+            1000);
+    </script>
+}
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Açık Artırmaya Katıl</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-group">
+                        <label for="recipient-name" class="col-form-label">Kullanıcı Adı :</label>
+                        <input type="text" class="form-control" id="recipient-name">
+                    </div>
+
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="disClick">İptal</button>
+                <button type="button" class="btn btn-primary" id="katilBtn">Devam</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="displayDiv">
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <h5 class="Timer"></h5>
+    </div>
+</div>
+
+
+<div class="" style="margin-left: -160px">
+    <div class="col-4" id="aucCard">
+
+    </div>
+    <div class="col-4" style="float: right; display: none" id="infoArtirma">
+        <h4 id="teklifVeren"></h4>
+        <h4 id="sonTeklif"></h4>
+
+        <input type="number" class="form-control" id="teklifTutar" />
+        <button class="btn btn-primary" id="teklifBtn">Teklif Gönder</button>
+
+    </div>
+    <div class="col-4" style="float: left">
+        <h3 style="display: none" id="titleK">Katılımcı Listesi</h3>
+
+        <ul id="userList">
+        </ul>
+
+    </div>
+</div>
+
+
+
